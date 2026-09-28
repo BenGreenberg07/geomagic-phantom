@@ -1,0 +1,17 @@
+# build output
+bin/
+build/
+build-*/
+out/
+.vs/
+*.obj
+*.pdb
+*.ilk
+*.exe
+
+# recordings: participant data never goes to GitHub
+data/
+
+__pycache__/
+*.pyc
+.DS_Store
