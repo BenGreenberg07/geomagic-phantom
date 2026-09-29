@@ -41,12 +41,14 @@ are not C++ build experts, so keep the workflow simple.
 - Never commit anything in `data/` (participant data) or OpenHaptics SDK files.
 
 ## Unverified on real hardware (check first on the lab PC)
-The code has only been compiled and run against the mock. Real-SDK risks:
-1. `build.bat` finding `hd.lib`: tries `lib\x64\Release`, `lib\x64`, `lib\x64\Debug`.
-2. Enum names used from `<HD/hd.h>` (`HD_CURRENT_GIMBAL_ANGLES`, `HD_NOMINAL_MAX_*`,
-   `HD_CALIBRATION_*`, error codes `HD_COMM_ERROR`, `HD_TIMER_ERROR`, ...). If one
-   doesn't exist, it's a compile error, so fix it in `phantom.h`.
-3. Premium encoder-reset calibration flow in `Device::calibrate` (modelled on the
-   SDK "Calibration" console example).
-4. Axis directions and the button bit on this particular device.
-5. Default safety limits (60 % of continuous force, 1000 mm/s trip) feel sensible.
+The code has only been run against the mock. Checked Sept 28 2026 against the real
+OpenHaptics 3.5.0 headers and lib layout (from `matthewdkim2025/Towles-research-2026`):
+- DONE: every `HD_*` name and HD function used exists in the real headers, and all
+  apps type-check against them. `hd.lib` is at `lib\x64\Release`, where `build.bat`
+  looks first. Still to confirm: an actual `cl.exe` build on the lab PC.
+- DONE: `Device::calibrate` follows the SDK "Calibration" example's encoder-reset path
+  (`hdUpdateCalibration(HD_CALIBRATION_ENCODER_RESET)` before the scheduler starts).
+Still open:
+1. Whether calibration reports OK on this Premium, and what the reset pose is exactly.
+2. Axis directions and the button bit on this particular device.
+3. Default safety limits (60 % of continuous force, 1000 mm/s trip) feel sensible.

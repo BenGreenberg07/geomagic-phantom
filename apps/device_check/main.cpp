@@ -8,6 +8,7 @@
 //   Q  quit
 //
 // Options: --device "<name>"  --skip-calibration  --k <N/mm> (spring, default 0.05)
+//          --allow-uncalibrated (let S turn the spring on even if calibration failed)
 
 #include <cstdio>
 
@@ -19,6 +20,7 @@ using phantom::Vec3;
 int main(int argc, char** argv) {
     util::Args args(argc, argv);
     double k = args.num("--k", 0.05);
+    bool allowUncal = args.flag("--allow-uncalibrated");
 
     phantom::Device dev;
     if (!dev.open(args.get("--device", "").c_str(), args.flag("--skip-calibration"))) return 1;
@@ -37,7 +39,9 @@ int main(int argc, char** argv) {
         if (console::keyPressed()) {
             int c = console::readKey();
             if (c == 'q' || c == 'Q' || c == 27 || c < 0) break;
-            if (c == 's' || c == 'S') {
+            if ((c == 's' || c == 'S') && !springOn && !dev.info().calibrated && !allowUncal) {
+                std::printf("\nNot calibrated, so the spring stays off (rerun and calibrate, or pass --allow-uncalibrated).\n");
+            } else if (c == 's' || c == 'S') {
                 springOn = !springOn;
                 if (springOn) {
                     dev.resetTrip();

@@ -394,9 +394,9 @@ private:
             // PHANToM Premium: encoders are relative, so after every power-up the
             // arm must be held in its reset position while we zero them.
             std::printf("\nCALIBRATION (encoder reset)\n"
-                        "  Hold the arm (and gimbal) in the reset position - the same pose\n"
-                        "  you use for PHANToM Test / Touch Smart Setup calibration - and\n"
-                        "  keep it still. Then press ENTER.\n");
+                        "  Hold the arm in its reset position (the SDK says: all links\n"
+                        "  orthogonal, the same pose PHANToM Test uses) and keep it still.\n"
+                        "  Then press ENTER.\n");
             console::waitEnter();
             hdUpdateCalibration(HD_CALIBRATION_ENCODER_RESET);
             if (reportErrors("encoder reset")) return false;
