@@ -4,7 +4,9 @@
 // Lets the apps compile and run on any machine (a Mac/Linux laptop, CI) with a
 // simulated arm: a point mass with a lazy "hand" drifting in slow circles, and
 // the stylus button pressed briefly every HD_MOCK_BUTTON_PERIOD seconds
-// (default 3). It implements only the subset of HD this repo uses. Names and
+// (default 3). HD_MOCK_HAND=still makes the hand rest at the origin instead,
+// so pushes from the app show up cleanly, and HD_MOCK_FLIP=x makes the x motor
+// push backwards (to check that force_direction catches a wiring/sign error). It implements only the subset of HD this repo uses. Names and
 // signatures match the real header; numeric values do not.
 //
 // Build with:  cmake -S . -B build-mock -DPHANTOM_MOCK=ON && cmake --build build-mock

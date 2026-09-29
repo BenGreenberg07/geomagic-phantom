@@ -44,7 +44,7 @@ inline bool& eof() { static bool e = false; return e; }
 
 inline bool keyPressed() {
     detail::raw();
-    if (detail::eof()) return false;
+    if (detail::eof()) return true;  // so the next readKey() returns -1 and apps quit
     fd_set fds;
     FD_ZERO(&fds);
     FD_SET(0, &fds);
@@ -53,6 +53,7 @@ inline bool keyPressed() {
 }
 inline int readKey() {
     detail::raw();
+    if (detail::eof()) return -1;
     unsigned char c;
     if (read(0, &c, 1) != 1) { detail::eof() = true; return -1; }
     return c;

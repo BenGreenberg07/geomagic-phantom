@@ -28,12 +28,15 @@ struct Sim {
     int buttons = 0;
     double buttonPeriod = 3.0;
     bool forceOut = true, calibrated = false;
+    double flip[3] = {1, 1, 1};  // HD_MOCK_FLIP=x (or y, z, xyz...): that motor pushes backwards
+    bool stillHand = false;    // HD_MOCK_HAND=still: hand rests at the origin instead of circling
 
     void step(double dt) {
         double w = 2 * M_PI * 0.3;
         double tgt[3] = {30 * std::cos(w * t), 20 * std::sin(w * t), 10 * std::sin(0.5 * w * t)};
+        if (stillHand) tgt[0] = tgt[1] = tgt[2] = 0;
         for (int i = 0; i < 3; ++i) {
-            double f = handK * (tgt[i] - pos[i]) - handB * vel[i] + (forceOut ? cmdForce[i] : 0);
+            double f = handK * (tgt[i] - pos[i]) - handB * vel[i] + (forceOut ? flip[i] * cmdForce[i] : 0);
             vel[i] += f / mass * 1000.0 * dt;  // N/kg = m/s^2 -> mm/s^2
             pos[i] += vel[i] * dt;
         }
@@ -95,6 +98,9 @@ extern "C" {
 
 HHD hdInitDevice(HDstring) {
     if (const char* p = std::getenv("HD_MOCK_BUTTON_PERIOD")) g.buttonPeriod = std::atof(p);
+    if (const char* p = std::getenv("HD_MOCK_FLIP"))
+        for (int i = 0; i < 3; ++i) g.flip[i] = std::strchr(p, "xyz"[i]) ? -1 : 1;
+    if (const char* p = std::getenv("HD_MOCK_HAND")) g.stillHand = std::strcmp(p, "still") == 0;
     return 0;
 }
 void hdDisableDevice(HHD) {}
