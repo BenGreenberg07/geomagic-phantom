@@ -73,10 +73,10 @@
 #include "util.h"     // small helpers (CSV files, command-line options)
 #include "viz.h"      // the 3D framework: window, drawing, the scene runner
 
-// Everything between here and "#else" is only compiled on Windows, because the
-// window code is Windows-specific. On a Mac the simulator build skips to the
-// tiny main() at the bottom of the file.
-#ifdef _WIN32
+// Everything between here and "#else" is only compiled when a 3D window is
+// available (Windows, or the CMake build that downloads GLFW on a Mac). Otherwise
+// the build skips to the tiny main() at the bottom of the file.
+#if VIZ_AVAILABLE
 
 // Short names, so we can write "Vec3" instead of "viz::Vec3".
 using viz::State;  // one 1 ms snapshot of the device: position, velocity, buttons...
@@ -306,5 +306,5 @@ int main(int argc, char** argv) {
 
 #else
 // Not Windows (e.g. the simulator build on a Mac): just say so.
-int main() { std::printf("grab_ball needs Windows (Win32 + OpenGL). Build it on the lab PC.\n"); return 0; }
+int main() { std::printf("grab_ball needs a 3D window: build on Windows, or with CMake (it fetches GLFW) elsewhere.\n"); return 0; }
 #endif

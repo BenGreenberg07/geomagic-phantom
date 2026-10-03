@@ -6,7 +6,11 @@
 // the stylus button pressed briefly every HD_MOCK_BUTTON_PERIOD seconds
 // (default 3). HD_MOCK_HAND=still makes the hand rest at the origin instead,
 // so pushes from the app show up cleanly, and HD_MOCK_FLIP=x makes the x motor
-// push backwards (to check that force_direction catches a wiring/sign error). It implements only the subset of HD this repo uses. Names and
+// push backwards (to check that force_direction catches a wiring/sign error).
+// The 3D apps drive the hand with the mouse instead (hdMockSetHand). Device limits
+// and calibration behave like the lab's Premium HID; arm mass / friction / gravity
+// come from bin\device_id (env HD_MOCK_MASS, _FRICTION, _VISCOUS, _GRAVITY override).
+// HD_MOCK_CAL=reset simulates an encoder-reset-only device. It implements only the subset of HD this repo uses. Names and
 // signatures match the real header; numeric values do not.
 //
 // Build with:  cmake -S . -B build-mock -DPHANTOM_MOCK=ON && cmake --build build-mock
@@ -117,6 +121,13 @@ HDboolean hdIsEnabled(HDenum cap);
 
 HDErrorInfo hdGetError(void);
 HDstring hdGetErrorString(HDerror errorCode);
+
+// Mock only (not in the real SDK): the simulator's mouse-driven hand.
+// hdMockSetHand: where the hand wants the stylus (mm, device frame) + button bits.
+// hdMockGetHand: where the (speed-limited) hand actually is right now.
+#define HD_MOCK 1
+void hdMockSetHand(const double target[3], int buttons);
+void hdMockGetHand(double target[3]);
 
 HDenum hdCheckCalibration(void);
 void hdUpdateCalibration(HDenum style);

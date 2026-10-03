@@ -97,6 +97,7 @@ drag/arrows rotate, wheel zooms, F force arrow, X remove room, Q quit.
 | `bin\surfaces.exe` | Friction block (M = friction level), bumpy floor, magnet, honey zone. |
 | `bin\mechanisms.exe` | Clicky push button; hold the stylus button on the drawer handle or lever knob to grab them. |
 | `bin\physics_toys.exe` | Bumping balls, pendulum, wobbly soft blob. R resets. |
+| `bin\draw3d.exe` | Paint glowing 3D tubes: hold the button to draw in the air, or press on the easel / globe (M). 1-5 brush, C colour, S mirror/kaleidoscope, H feel your strokes, T spin, D demo, Z undo, N clear. Strokes saved to `_strokes.csv`. |
 
 **Options most programs accept:** `--k 0.2` (stiffness, N/mm, capped for safety), `--b 0.001` (damping),
 `--device "<name>"` (if Phantom Configuration has several devices), `--skip-calibration`,
@@ -129,6 +130,7 @@ rotate the view, wheel zooms, F hides the force arrow, X removes the room, Q qui
 | `reach_game` | Center-out reaching task: 8 targets x 3 rounds. Writes a `_trials.csv` with reaction time, movement time, path ratio, peak speed, number of submovements. |
 | `mechanisms` | Click button (force drop at 2.5 mm), a drawer on a rail with end stops and a magnetic catch, a lever with notches. Grab with button 1. |
 | `physics_toys` | Balls that bump each other, a 3D pendulum, a soft blob that wobbles and visibly dents. |
+| `draw3d` | 3D painting: air / easel (paper friction) / globe canvases, rainbow tubes, symmetry, touchable strokes. |
 
 All output goes to `data/` (git-ignored, because it's participant data).
 
@@ -159,6 +161,14 @@ limits, fade-in, a speed cut-out and thread-safe logging, so a bug in your
 program can't fling the arm.
 
 ## No device handy?
+
+**On the lab PC (or any Windows PC with Visual Studio):** `build.bat sim` builds simulator copies of
+every program into `bin\sim\` (the real `bin\` programs are untouched). In the 3D programs the
+**mouse is your hand**: move = stylus, wheel = nearer/further, SHIFT+wheel = zoom, right button or
+SPACE = stylus button. A faint ghost ball shows your hand; the gap to the stylus is the force you'd feel.
+The simulated arm's mass/friction are placeholders until measured on the real device (work in progress).
+
+**Elsewhere (Mac/Linux):**
 
 Build against the simulator (Mac/Linux/Windows):
 ```

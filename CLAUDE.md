@@ -21,6 +21,8 @@ are not C++ build experts, so keep the workflow simple.
 
 ## Build & test
 - Lab PC: `build.bat` (or `build.bat <app>`). Uses cl.exe directly. No .vcxproj.
+  `build.bat sim [app]` builds against tools/hd_mock into bin\sim\ (mouse drives the hand in 3D apps).
+  Self-test a 3D app without a person: `VIZ_KEYS=D VIZ_SHOT=x.ppm VIZ_QUIT_AFTER=3 bin/sim/<app>.exe`.
 - Anywhere without hardware:
   `cmake -S . -B build-mock -DPHANTOM_MOCK=ON && cmake --build build-mock`, then run
   `bin/<app>` and pipe keys, e.g. `(printf '\n'; sleep 5; printf q) | ./bin/position_tracker`.

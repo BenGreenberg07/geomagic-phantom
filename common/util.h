@@ -59,11 +59,12 @@ inline std::string humanTime() {
     return b;
 }
 
-// <repo>/data when the exe lives in <repo>/bin, otherwise ./data. Created if missing.
+// <repo>/data when the exe lives in <repo>/bin (or bin/sim), otherwise ./data. Created if missing.
 inline std::filesystem::path dataDir(const char* argv0) {
     namespace fs = std::filesystem;
     std::error_code ec;
     fs::path exeDir = fs::absolute(argv0, ec).lexically_normal().parent_path();
+    if (exeDir.filename() == "sim" && exeDir.parent_path().filename() == "bin") exeDir = exeDir.parent_path();  // bin\sim
     fs::path dir = (exeDir.filename() == "bin") ? exeDir.parent_path() / "data" : fs::current_path() / "data";
     fs::create_directories(dir, ec);
     return dir;

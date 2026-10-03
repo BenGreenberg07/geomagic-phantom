@@ -26,7 +26,7 @@
 #include "util.h"
 #include "viz.h"
 
-#ifdef _WIN32
+#if VIZ_AVAILABLE
 
 using viz::State;
 using viz::Vec3;
@@ -209,5 +209,5 @@ int main(int argc, char** argv) {
 }
 
 #else
-int main() { std::printf("mechanisms needs Windows (Win32 + OpenGL). Build it on the lab PC.\n"); return 0; }
+int main() { std::printf("mechanisms needs a 3D window: build on Windows, or with CMake (it fetches GLFW) elsewhere.\n"); return 0; }
 #endif
