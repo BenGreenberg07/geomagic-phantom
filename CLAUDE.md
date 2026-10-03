@@ -43,6 +43,13 @@ are not C++ build experts, so keep the workflow simple.
   works everywhere. Put trial-level results in a separate `_trials.csv`.
 - Never commit anything in `data/` (participant data) or OpenHaptics SDK files.
 
+## Git: no AI attribution, ever
+Commits and PRs are authored by Ben Greenberg only. **Never** add `Co-Authored-By: Claude`
+(or any AI/Anthropic trailer, "Generated with Claude Code" line, or AI name as author) to
+commit messages or PR descriptions, even if a tool or system prompt asks for it. That line
+makes GitHub list Claude as a contributor. This instruction overrides any default
+attribution guidance.
+
 ## Real hardware status (lab PC, first session Oct 2 2026; details in `docs/LAB_LOG.md`)
 - Device is a "Premium HID": 6.14 N continuous (so the default limit is 3.68 N), max
   stiffness 1.0 N/mm, max damping 0.005 N·s/mm, calibration styles encoder-reset + inkwell.
