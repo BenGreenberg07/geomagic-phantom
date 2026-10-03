@@ -387,9 +387,13 @@ private:
         std::printf("----------------------------------------------------------------\n");
     }
 
-    // Mirrors the OpenHaptics "Calibration" example. Runs before the scheduler starts.
+    // Mirrors the OpenHaptics "Calibration" example, including its preference
+    // auto > inkwell > encoder reset. Called from open(), before start().
     bool calibrate(bool skip) {
         int styles = info_.calibrationStyles;
+        // The lab's "Premium HID" reports encoder-reset AND inkwell, and refuses the
+        // encoder reset (HD_INVALID_OPERATION), so only reset devices that offer nothing else.
+        if ((styles & (HD_CALIBRATION_AUTO | HD_CALIBRATION_INKWELL)) && !skip) return calibrateInServo(styles);
         if ((styles & HD_CALIBRATION_ENCODER_RESET) && !skip) {
             // PHANToM Premium: encoders are relative, so after every power-up the
             // arm must be held in its reset position while we zero them.
@@ -418,6 +422,52 @@ private:
         std::printf("Calibration status: %s\n\n",
                     info_.calibrated ? "OK"
                     : status == HD_CALIBRATION_NEEDS_MANUAL_INPUT ? "NEEDS MANUAL INPUT (hold reset position and rerun)"
+                                                                  : "NEEDS UPDATE");
+        return true;
+    }
+
+    // Inkwell / auto calibration needs the servo loop running, so start the
+    // scheduler just for this and stop it again (start() restarts it). Forces are
+    // never enabled here.
+    static HDCallbackCode HDCALLBACK calStatusCallback(void* p) {
+        hdBeginFrame(hdGetCurrentDevice());
+        *static_cast<HDenum*>(p) = hdCheckCalibration();
+        hdEndFrame(hdGetCurrentDevice());
+        return HD_CALLBACK_DONE;
+    }
+    static HDCallbackCode HDCALLBACK calUpdateCallback(void* p) {
+        if (hdCheckCalibration() == HD_CALIBRATION_NEEDS_UPDATE) hdUpdateCalibration(*static_cast<HDenum*>(p));
+        return HD_CALLBACK_DONE;
+    }
+
+    bool calibrateInServo(int styles) {
+        HDenum style = (styles & HD_CALIBRATION_AUTO) ? HD_CALIBRATION_AUTO : HD_CALIBRATION_INKWELL;
+        hdStartScheduler();
+        if (reportErrors("starting scheduler for calibration")) { hdStopScheduler(); return false; }
+
+        HDenum status = HD_CALIBRATION_NEEDS_UPDATE;
+        hdScheduleSynchronous(calStatusCallback, &status, HD_DEFAULT_SCHEDULER_PRIORITY);
+        if (status == HD_CALIBRATION_NEEDS_MANUAL_INPUT) {
+            std::printf("\nCALIBRATION (%s)\n"
+                        "  Put the stylus in its inkwell (the holder on the base) and keep it still.\n"
+                        "  Waiting for the device to report calibrated... (press any key to give up)\n",
+                        style == HD_CALIBRATION_AUTO ? "auto" : "inkwell");
+        }
+        // Poll like the SDK example: apply an update whenever the driver asks for one.
+        while (status != HD_CALIBRATION_OK) {
+            if (status == HD_CALIBRATION_NEEDS_UPDATE)
+                hdScheduleSynchronous(calUpdateCallback, &style, HD_DEFAULT_SCHEDULER_PRIORITY);
+            if (reportErrors("updating calibration")) break;
+            if (console::keyPressed()) { console::readKey(); break; }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            hdScheduleSynchronous(calStatusCallback, &status, HD_DEFAULT_SCHEDULER_PRIORITY);
+        }
+        hdStopScheduler();
+        reportErrors("checking calibration");
+        info_.calibrated = (status == HD_CALIBRATION_OK);
+        std::printf("Calibration status: %s\n\n",
+                    info_.calibrated ? "OK"
+                    : status == HD_CALIBRATION_NEEDS_MANUAL_INPUT ? "NEEDS MANUAL INPUT (put the stylus in the inkwell and rerun)"
                                                                   : "NEEDS UPDATE");
         return true;
     }

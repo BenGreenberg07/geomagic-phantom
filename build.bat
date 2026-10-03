@@ -12,6 +12,9 @@ setlocal EnableExtensions
 cd /d "%~dp0"
 
 if not defined OH_SDK_BASE set "OH_SDK_BASE=C:\OpenHaptics\Developer\3.5.0"
+rem OH_SDK_BASE can be set but stale (lab PC: the SDK lives in "C:\OpenHaptics - Ben").
+if not exist "%OH_SDK_BASE%\include\HD\hd.h" if exist "C:\OpenHaptics\Developer\3.5.0\include\HD\hd.h" set "OH_SDK_BASE=C:\OpenHaptics\Developer\3.5.0"
+if not exist "%OH_SDK_BASE%\include\HD\hd.h" if exist "C:\OpenHaptics - Ben\Developer\3.5.0\include\HD\hd.h" set "OH_SDK_BASE=C:\OpenHaptics - Ben\Developer\3.5.0"
 if not exist "%OH_SDK_BASE%\include\HD\hd.h" goto :no_sdk
 
 set "HDLIB="
@@ -28,6 +31,8 @@ if not exist "%VSWHERE%" goto :no_vs
 set "VSPATH="
 for /f "usebackq tokens=*" %%i in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSPATH=%%i"
 if not defined VSPATH goto :no_vs
+rem Skip VS's telemetry step: it launches powershell.exe, which is blocked on the lab PC (error popup).
+set "VSCMD_SKIP_SENDTELEMETRY=1"
 call "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat" >nul
 where cl >nul 2>nul
 if errorlevel 1 goto :no_vs
@@ -53,7 +58,7 @@ exit /b 0
 
 :build_one
 echo === %~1
-cl /nologo /std:c++17 /EHsc /O2 /W3 /MD /DNOMINMAX /D_CRT_SECURE_NO_WARNINGS ^
+cl /nologo /std:c++17 /EHsc /O2 /W3 /MD /DWIN32 /DNOMINMAX /D_CRT_SECURE_NO_WARNINGS ^
    /I common /I "%OH_SDK_BASE%\include" ^
    "apps\%~1\main.cpp" /Fo"build\obj\%~1.obj" /Fe"bin\%~1.exe" ^
    /link /LIBPATH:"%HDLIB%" hd.lib >"build\%~1.log" 2>&1

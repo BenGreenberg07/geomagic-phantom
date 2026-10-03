@@ -26,7 +26,10 @@ are not C++ build experts, so keep the workflow simple.
   `bin/<app>` and pipe keys, e.g. `(printf '\n'; sleep 5; printf q) | ./bin/position_tracker`.
   `HD_MOCK_BUTTON_PERIOD=1` makes the fake button press every second.
 - Always build with the mock (no warnings under -Wall -Wextra) before handing code
-  to someone to run on the real device.
+  to someone to run on the real device. (The lab PC has no g++/cmake; there, build with
+  `build.bat` and check `build\<app>.log` for warnings.)
+- People run the device programs themselves (keyboard + hand on the arm). Don't run
+  anything that opens the device unless asked; give the command and what to expect.
 
 ## Rules for new code
 - Units: mm, mm/s, N, N/mm, N·s/mm, rad, s. Device frame: +x right, +y up, +z toward user.
@@ -40,15 +43,21 @@ are not C++ build experts, so keep the workflow simple.
   works everywhere. Put trial-level results in a separate `_trials.csv`.
 - Never commit anything in `data/` (participant data) or OpenHaptics SDK files.
 
-## Unverified on real hardware (check first on the lab PC)
-The code has only been run against the mock. Checked Sept 28 2026 against the real
-OpenHaptics 3.5.0 headers and lib layout (from `matthewdkim2025/Towles-research-2026`):
-- DONE: every `HD_*` name and HD function used exists in the real headers, and all
-  apps type-check against them. `hd.lib` is at `lib\x64\Release`, where `build.bat`
-  looks first. Still to confirm: an actual `cl.exe` build on the lab PC.
-- DONE: `Device::calibrate` follows the SDK "Calibration" example's encoder-reset path
-  (`hdUpdateCalibration(HD_CALIBRATION_ENCODER_RESET)` before the scheduler starts).
-Still open:
-1. Whether calibration reports OK on this Premium, and what the reset pose is exactly.
-2. Axis directions and the button bit on this particular device.
-3. Default safety limits (60 % of continuous force, 1000 mm/s trip) feel sensible.
+## Real hardware status (lab PC, first session Oct 2 2026; details in `docs/LAB_LOG.md`)
+- Device is a "Premium HID": 6.14 N continuous (so the default limit is 3.68 N), max
+  stiffness 1.0 N/mm, max damping 0.005 N·s/mm, calibration styles encoder-reset + inkwell.
+- DONE: `build.bat` builds every app with cl.exe, zero warnings. Needs `/DWIN32` (SDK
+  headers), tolerates the lab's stale `OH_SDK_BASE` (SDK is in `C:\OpenHaptics - Ben\...`),
+  and sets `VSCMD_SKIP_SENDTELEMETRY=1` because PowerShell is blocked by IT on that PC.
+- DONE: calibration. This device refuses the encoder reset (HD_INVALID_OPERATION);
+  `Device::calibrate` now prefers auto > inkwell > encoder reset like the SDK example, and
+  reports OK.
+- DONE: axes (+x right, +y up, +z toward user), button 1 = 0x1, force directions correct.
+- Open: position zero looks offset ~60–70 mm in y; the 60 % force default may be strong.
+
+## 3D apps
+`common/viz.h` (Windows only) runs a scene: device open, place/re-center/trip, CSV, window,
+camera, cursor. A scene supplies `force()` (servo thread), `snap()`, `draw()` (main thread,
+use only the Snap). Use `viz::BoxProxy` for boxes (entry-face memory; nearest-face boxes
+jitter at edges). Apps that include it must have a non-Windows stub `main` so the mock
+build still works.

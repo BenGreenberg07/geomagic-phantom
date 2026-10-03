@@ -7,6 +7,8 @@
 //      (checks that forces push the right way; should feel like a soft pull back)
 //   Q  quit
 //
+// Output: data/device_check_<stamp>.csv (every servo sample; phase 1 = spring on)
+//
 // Options: --device "<name>"  --skip-calibration  --k <N/mm> (spring, default 0.05)
 //          --allow-uncalibrated (let S turn the spring on even if calibration failed)
 
@@ -30,8 +32,21 @@ int main(int argc, char** argv) {
 
     // Written from the main thread only through runInServo(), read in the servo loop.
     Vec3 anchor;
-    dev.setForceFunction([&](phantom::State& s) { return phantom::springDamper(s, anchor, Vec3(), k, 0.0); });
+    bool springTag = false;  // servo thread only; set through runInServo
+    dev.setForceFunction([&](phantom::State& s) {
+        s.phase = springTag ? 1 : 0;
+        return phantom::springDamper(s, anchor, Vec3(), k, 0.0);
+    });
     if (!dev.start(true)) return 1;
+
+    auto csvPath = util::dataDir(argv[0]) / ("device_check_" + util::stamp() + ".csv");
+    FILE* csv = util::openCsv(csvPath);
+    if (!csv) { dev.close(); return 1; }
+    util::writeSampleHeader(csv);
+    char extra[64];
+    std::snprintf(extra, sizeof extra, "test_spring_k_N_mm: %.4f\n", k);
+    util::writeInfoFile(csvPath, dev, extra);
+    dev.startRecording();
 
     std::printf("Live readout. S = toggle weak spring (k=%.3f N/mm), Q = quit.\n\n", k);
     bool springOn = false;
@@ -48,10 +63,13 @@ int main(int argc, char** argv) {
                     Vec3 here = dev.latest().pos;  // never call latest() inside runInServo
                     dev.runInServo([&] { anchor = here; });
                 }
+                dev.runInServo([&] { springTag = springOn; });
                 dev.enableForces(springOn);
                 std::printf("\nspring %s\n", springOn ? "ON (anchored here)" : "OFF");
             }
         }
+        phantom::State rec;
+        while (dev.popSample(rec)) util::writeSample(csv, rec, 0);
         phantom::State s = dev.latest();
         std::printf("\rpos %7.1f %7.1f %7.1f mm | speed %6.0f mm/s | gimbal %6.1f %6.1f %6.1f deg | "
                     "btn %d%d | F %.2f N | %4.0f Hz ",
@@ -62,11 +80,17 @@ int main(int argc, char** argv) {
             std::printf("\nSAFETY TRIP: %s. Forces off. Press S to re-arm.\n", phantom::tripName(dev.tripped()));
             dev.enableForces(false);
             springOn = false;
+            dev.runInServo([&] { springTag = false; });
             dev.resetTrip();
         }
         util::sleepMs(50);
     }
     std::printf("\n");
+    phantom::State rec;
+    while (dev.popSample(rec)) util::writeSample(csv, rec, 0);
+    dev.stopRecording();
+    std::fclose(csv);
+    std::printf("Saved %s\n", csvPath.string().c_str());
     if (dev.lastError() != HD_SUCCESS) std::printf("Last HD error seen: %s\n", hdGetErrorString(dev.lastError()));
     dev.close();
     return 0;

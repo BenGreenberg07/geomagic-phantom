@@ -28,19 +28,36 @@ python analysis\analyze.py data\<file>.csv
 | `damping_field` | yes, drag only | "Moving through honey", levels 0-3. Can't store energy, so it's the safest force to feel first. |
 | `virtual_box` | yes | Invisible box around where you place it (ENTER or button 1). One-sided walls with damping. |
 
+### 3D programs (a window you can see while you feel)
+
+All of these open a 3D window, place their "room" around the stylus when you press ENTER, and share
+[`common/viz.h`](common/viz.h) (window, camera, safety, logging). Click the window first; drag or arrows
+rotate the view, wheel zooms, F hides the force arrow, X removes the room, Q quits.
+
+| Program | What it does |
+|---|---|
+| `haptic_playground` | Room with a hard cube, a soft sphere and a ball to push. The first demo. |
+| `grab_ball` | Hold button 1 near the ball to pick it up, feel its weight (1/2/3 = 40/80/150 g), carry it to the shelf, drop or throw it. |
+| `surfaces` | Friction block (stick-slip, M = level), bumpy floor texture, a magnet, a honey (viscous) zone. |
+| `reach_game` | Center-out reaching task: 8 targets x 3 rounds. Writes a `_trials.csv` with reaction time, movement time, path ratio, peak speed, number of submovements. |
+| `mechanisms` | Click button (force drop at 2.5 mm), a drawer on a rail with end stops and a magnetic catch, a lever with notches. Grab with button 1. |
+| `physics_toys` | Balls that bump each other, a 3D pendulum, a soft blob that wobbles and visibly dents. |
+
 All output goes to `data/` (git-ignored, because it's participant data).
 
 ## First session on a new device (in this order)
 
 Each step only if the one before looked right. Close every other haptics program first.
 
-1. `bin\device_check.exe`: calibrate (hold the reset pose, press ENTER), watch the numbers. Don't press S yet.
+1. `bin\device_check.exe`: calibrate, watch the numbers. Don't press S yet. (On the lab's Premium the
+   calibration is inkwell-style and usually already OK; if asked, put the stylus in its holder.)
 2. `bin\axis_check.exe`: no forces. All three axes should say PASS.
 3. `bin\force_direction.exe`: hold the stylus loosely. All six pushes should say PASS.
 4. `bin\damping_field.exe`: try levels 1, 2, 3. Should feel smooth, not gritty.
 5. `bin\virtual_box.exe`: press ENTER, then feel for the walls. Should feel solid, not buzzy.
 
 Stop at the first thing that surprises you. Q always turns forces off immediately.
+Results of the first session on the lab PC (Oct 2 2026) are in [`docs/LAB_LOG.md`](docs/LAB_LOG.md).
 
 ## Making a new program
 
@@ -68,7 +85,7 @@ check that `force_direction` catches it.
 ## Layout
 
 ```
-common/       phantom.h (safe device layer), util.h, console.h
+common/       phantom.h (safe device layer), viz.h (3D apps), util.h, console.h
 apps/         one folder per program -> bin/<name>.exe
 analysis/     analyze.py (speed, smoothness/SPARC, path length, matching errors + plots)
 tools/hd_mock simulated device for testing without hardware

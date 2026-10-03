@@ -14,6 +14,8 @@
 //   6. twist and tilt the stylus for 5 s                      -> gimbal angles
 // At the end it prints a PASS/CHECK summary and the ranges seen.
 //
+// Output: data/axis_check_<stamp>.csv (every servo sample; trial = step 0-2 axes, 3-4 buttons, 5 gimbal)
+//
 // Options: --device "<name>"  --skip-calibration  --move 50 (mm asked for)
 // Keys: Q = quit at any prompt.
 
@@ -80,9 +82,16 @@ int main(int argc, char** argv) {
     if (!dev.start(false)) return 1;  // read-only: motors are never driven
     if (!dev.info().calibrated) std::printf("WARNING: not calibrated, positions may be offset (axes still testable).\n");
 
+    auto csvPath = util::dataDir(argv[0]) / ("axis_check_" + util::stamp() + ".csv");
+    FILE* csv = util::openCsv(csvPath);
+    if (!csv) { dev.close(); return 1; }
+    util::writeSampleHeader(csv);
+    util::writeInfoFile(csvPath, dev, "");
+
     Ranges r;
-    dev.startRecording();  // every servo sample -> queue; used here only for ranges
-    auto drain = [&] { State s; while (dev.popSample(s)) r.add(s); };
+    int step = -1;  // written to the CSV trial column; set on the main thread, so no servo race
+    dev.startRecording();  // every servo sample -> queue -> ranges + CSV
+    auto drain = [&] { State s; while (dev.popSample(s)) { r.add(s); s.trial = step; util::writeSample(csv, s, 0); } };
 
     const char* words[3] = {"RIGHT", "UP", "TOWARD YOU"};
     const char* expect[3] = {"+x", "+y", "+z"};
@@ -94,6 +103,8 @@ int main(int argc, char** argv) {
     char msg[200];
 
     for (int i = 0; i < 3 && !quit; ++i) {
+        drain();
+        step = i;
         if (!waitEnterLive(dev, "Put the stylus in the MIDDLE of the workspace and hold it still.")) { quit = true; break; }
         drain();
         Vec3 p0 = dev.latest().pos;
@@ -115,6 +126,8 @@ int main(int argc, char** argv) {
 
     // Buttons: watch for each press for up to 10 s.
     for (int b = 0; b < 2 && !quit; ++b) {
+        drain();
+        step = 3 + b;
         std::printf("\nPress and release stylus button %d (10 s, ENTER skips).\n", b + 1);
         for (int t = 0; t < 1000; ++t) {
             if (console::keyPressed()) {
@@ -140,6 +153,7 @@ int main(int argc, char** argv) {
     if (!quit) {
         std::printf("\nTwist and tilt the stylus for 5 seconds...\n");
         drain();
+        step = 5;
         r.resetGimbal();
         for (int t = 0; t < 50; ++t) { util::sleepMs(100); drain(); }
         std::printf("  gimbal ranges (deg): %.0f  %.0f  %.0f  (each should be well above 10)\n",
@@ -148,6 +162,7 @@ int main(int argc, char** argv) {
 
     drain();
     dev.stopRecording();
+    std::fclose(csv);
     std::printf("\n================ SUMMARY ================\n");
     for (int i = 0; i < 3; ++i) std::printf(" %-11s expected %s : %s\n", words[i], expect[i], result[i]);
     std::printf(" Buttons     : 0x%x, 0x%x  (apps treat 0x%x as button 1)\n", seen[0], seen[1],
@@ -164,6 +179,7 @@ int main(int argc, char** argv) {
     else if (allRun)
         std::printf(" Some axes did NOT match. Don't run force programs until this is understood.\n");
     std::printf("=========================================\n");
+    std::printf("Saved %s\n", csvPath.string().c_str());
     dev.close();
     return 0;
 }
