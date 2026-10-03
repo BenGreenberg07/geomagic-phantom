@@ -40,7 +40,9 @@
 //
 // Testing without anyone at the screen: VIZ_KEYS="D" presses those keys after
 // 0.5 s, VIZ_SHOT=file.ppm saves a screenshot and VIZ_QUIT_AFTER=3 quits after
-// 3 s (environment variables).
+// 3 s (environment variables). In the simulator, VIZ_SWEEP=1 moves the hand along
+// a slow figure-eight through the whole room (button held 1 s in every 4) so a
+// test run actually touches things.
 
 #if defined(_WIN32) && !defined(VIZ_GLFW)
 #define VIZ_WIN32 1
@@ -670,6 +672,8 @@ int run(int argc, char** argv, Scene& scene, const char* name, const char* help)
     const char* testKeys = std::getenv("VIZ_KEYS");
     const char* shotPath = std::getenv("VIZ_SHOT");
     double quitAfter = std::getenv("VIZ_QUIT_AFTER") ? std::atof(std::getenv("VIZ_QUIT_AFTER")) : 0;
+    bool sweep = std::getenv("VIZ_SWEEP") != nullptr;
+    (void)sweep;  // only used in the simulator
     auto t0 = std::chrono::steady_clock::now();
     bool keysSent = false;
 
@@ -747,9 +751,16 @@ int run(int argc, char** argv, Scene& scene, const char* name, const char* help)
                     simTarget = hit;
                 }
             }
+            int simButtons = (u.simRight || u.simSpace) ? HD_DEVICE_BUTTON_1 : 0;
+            if (sweep) {  // VIZ_SWEEP: scripted hand path through the whole room instead of the mouse
+                double w = 2 * 3.14159265358979 / 8.0;
+                simTarget = Vec3(70 * std::sin(w * elapsed), 45 * std::sin(1.3 * w * elapsed),
+                                 55 * std::sin(0.7 * w * elapsed + 1.0));
+                simButtons = std::fmod(elapsed, 4.0) > 3.0 ? HD_DEVICE_BUTTON_1 : 0;
+            }
             Vec3 dt = origin + simTarget;
             double tgt[3] = {dt.x, dt.y, dt.z};
-            hdMockSetHand(tgt, (u.simRight || u.simSpace) ? HD_DEVICE_BUTTON_1 : 0);
+            hdMockSetHand(tgt, simButtons);
         }
 #endif
 

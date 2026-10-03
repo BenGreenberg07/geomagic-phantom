@@ -40,11 +40,21 @@ struct RawMode {  // single-key input without ENTER, restored on exit
 };
 inline RawMode& raw() { static RawMode r; return r; }
 inline bool& eof() { static bool e = false; return e; }
+inline bool& eofTaken() { static bool t = false; return t; }  // has readKey() returned -1 yet?
+inline int rawRead() {
+    if (eof()) return -1;
+    unsigned char c;
+    if (read(0, &c, 1) != 1) { eof() = true; return -1; }
+    return c;
+}
 }  // namespace detail
 
+// End of input (piped/scripted runs only) is reported exactly once: keyPressed()
+// stays true until readKey() has returned -1, then false, so apps see it and quit
+// even if waitEnter() hit it first, and `while (keyPressed())` loops still end.
 inline bool keyPressed() {
     detail::raw();
-    if (detail::eof()) return true;  // so the next readKey() returns -1 and apps quit
+    if (detail::eof()) return !detail::eofTaken();
     fd_set fds;
     FD_ZERO(&fds);
     FD_SET(0, &fds);
@@ -53,14 +63,14 @@ inline bool keyPressed() {
 }
 inline int readKey() {
     detail::raw();
-    if (detail::eof()) return -1;
-    unsigned char c;
-    if (read(0, &c, 1) != 1) { detail::eof() = true; return -1; }
+    int c = detail::rawRead();
+    if (c < 0) detail::eofTaken() = true;
     return c;
 }
 inline void waitEnter() {
+    detail::raw();
     for (;;) {
-        int c = readKey();
+        int c = detail::rawRead();
         if (c == '\n' || c == '\r' || c < 0) return;
     }
 }

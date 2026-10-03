@@ -11,6 +11,7 @@ Sample files (tracker / raw task) -> per-segment movement metrics + plots:
     Balasubramanian et al. 2015), and dimensionless jerk (lower = smoother).
     Segments are the "marker" column for the tracker and "trial" for the task.
 Trial files (matching) -> absolute / constant / variable error by direction.
+Trial files (reach_game) -> reaction / movement time, path ratio, smoothness by direction and block.
 
 Plots and a summary CSV are written next to the input file.
 Needs: numpy, pandas, matplotlib  (pip install -r analysis/requirements.txt)
@@ -213,6 +214,36 @@ def analyze_trials(path, df, out_prefix):
     print(f"wrote {out_png}")
 
 
+def analyze_reach_trials(path, df, out_prefix):
+    """reach_game _trials.csv: the app already computed per-trial metrics; summarise them."""
+    print(f"{len(df)} reaches\n")
+    cols = ["reaction_time_s", "movement_time_s", "path_ratio", "peak_speed_mm_s", "speed_peaks"]
+    by_dir = df.groupby("direction")[cols].mean().round(3)
+    by_dir.insert(0, "n", df.groupby("direction").size())
+    print("By direction (path_ratio 1.0 = perfectly straight; fewer speed_peaks = smoother):")
+    print(by_dir.to_string())
+    by_block = df.groupby("block")[cols].mean().round(3)
+    print("\nBy block (practice effects show up as falling times / path ratio):")
+    print(by_block.to_string())
+    out_csv = out_prefix.with_name(out_prefix.name + "_by_direction.csv")
+    by_dir.to_csv(out_csv)
+    print(f"\nwrote {out_csv}")
+
+    if plt is None:
+        return
+    fig, axes = plt.subplots(1, 3, figsize=(13, 4))
+    for ax, c, label in zip(axes, ["movement_time_s", "path_ratio", "speed_peaks"],
+                            ["movement time (s)", "path ratio", "speed peaks"]):
+        ax.plot(df.index + 1, df[c], "o-", ms=3, lw=0.8)
+        ax.set_xlabel("reach #")
+        ax.set_ylabel(label)
+    fig.suptitle("Reach game: per-reach metrics")
+    fig.tight_layout()
+    out_png = out_prefix.with_name(out_prefix.name + "_reaches.png")
+    fig.savefig(out_png, dpi=130)
+    print(f"wrote {out_png}")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("csv", type=Path)
@@ -221,6 +252,8 @@ def main():
     prefix = args.csv.with_suffix("")
     if "abs_err_mm" in df.columns:
         analyze_trials(args.csv, df, prefix)
+    elif {"movement_time_s", "path_ratio", "block"} <= set(df.columns):
+        analyze_reach_trials(args.csv, df, prefix)
     elif {"t_s", "x_mm", "y_mm", "z_mm"} <= set(df.columns):
         analyze_samples(args.csv, df, prefix)
     elif {"timestamp", "x_mm"} <= set(df.columns):

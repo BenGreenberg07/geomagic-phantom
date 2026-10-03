@@ -3,6 +3,27 @@
 What was tried on the real device, what happened, and what was changed because of it.
 Newest first. Raw recordings stay in `data/` on the lab PC (never committed).
 
+## 2026-10-02 (evening, Mac): simulator check of the lab session's work
+
+No device. Everything checked against the simulator (tools/hd_mock).
+- **Mac/Linux 3D window was never wired up.** viz.h expected CMake to fetch GLFW, but CMakeLists.txt
+  didn't, so every 3D app only printed "needs a 3D window". CMake now downloads GLFW 3.4 on non-Windows
+  builds. All seven 3D apps open and render on the Mac.
+- **New test hook:** `VIZ_SWEEP=1` moves the simulated hand along a figure-eight through the room
+  (button held 1 s in every 4), so an unattended run actually touches everything.
+- **Sweep results (20 s per app):** 1000 Hz throughout, no NaN, no safety trips, force never above the
+  3.68 N limit. Force never *rose* faster than 65 mN per tick, except one 0.49 N step when the stylus hit
+  a wall at 430 mm/s (wall damping, as designed). The large one-tick changes were all *releases*
+  (force to zero): re-centering the room with button 1, or sliding off an object's edge while pressing
+  hard. In surfaces the scripted hand pushed past the force limit 30 mm into the friction block and
+  released 3.68 N when it slid out the side; a person pressing that hard would feel the same lunge as
+  slipping off a real table.
+- **Bug fixed (console.h, Mac/Linux only):** after end of input, `while (keyPressed())` loops in
+  position_tracker and position_matching spun forever (caused by the Sept 28 change). End of input is
+  now reported exactly once. Windows keyboard input was never affected.
+- All 15 programs run to completion in the simulator; position_matching completes 6/6 trials.
+- analyze.py now summarises reach_game `_trials.csv` (by direction and by block).
+
 ## 2026-10-02 — first session on the lab PC (first real build, first real run)
 
 **Setup found on the lab PC**
