@@ -15,6 +15,93 @@ bin\position_tracker.exe --id P01       # record movement at 1000 Hz
 python analysis\analyze.py data\<file>.csv
 ```
 
+## Using it on the lab computer (step by step)
+
+### 1. Open a Command Prompt (not PowerShell)
+PowerShell is blocked by IT on the lab PC. Press **Win + R**, type `cmd`, press Enter.
+(Or in Windows Terminal: the **˅** arrow next to the tab -> **Command Prompt**.)
+
+### 2. Go to the repo folder
+```
+cd /d C:\Users\bgreenb2\source\repos\geomagic-phantom
+```
+Every command below is typed **from this folder**. If a command says "not recognized", you're
+probably in the wrong folder: run the `cd` line again.
+
+First time on a new computer only (instead of `cd`): `git clone https://github.com/BenGreenberg07/geomagic-phantom.git`,
+then `cd geomagic-phantom`.
+
+### 3. Get the latest code and build it
+```
+git pull
+build.bat
+```
+- `git pull` downloads whatever was pushed to GitHub (e.g. from someone's laptop).
+- `build.bat` compiles every program into `bin\`. It should end with `Done.` If it says
+  `BUILD FAILED`, the compiler error is printed right above it. Copy it and ask.
+- `build.bat grab_ball` builds just one program (faster).
+
+### 4. Close other haptics programs, then run one
+Only **one** program can use the arm at a time: close PHANToM Test, Phantom Configuration's test,
+and any OpenHaptics example first. Then type the program's command, for example:
+```
+bin\device_check.exe
+```
+Every program calibrates first. On this Premium it usually just says `Calibration status: OK`;
+if it asks, put the stylus in its holder (inkwell). **Q always quits and turns forces off at once.**
+3D programs open a window: **click the window first** so it gets your key presses.
+
+### 5. Your data
+Every program saves to `data\` as `<program>_<date>_<time>.csv` (every 1 ms sample) plus an
+`.info.txt` with the settings. `data\` never goes to GitHub (participant data); copy it off yourself.
+To analyse a recording (needs Python, once: `pip install -r analysis\requirements.txt`):
+```
+python analysis\analyze.py data\<file>.csv
+```
+
+### 6. Saving code changes back to GitHub
+```
+git add -A
+git commit -m "what you changed"
+git push
+```
+(`data\`, `bin\` and `build\` are ignored automatically.)
+
+### Command list
+
+**Checks (run at the start of a session, in this order)**
+
+| Command | Forces | What it does / what to do |
+|---|---|---|
+| `bin\device_check.exe` | weak spring only if you press S | Device info, calibration, live position/speed/buttons/1000 Hz. Run first, every session. |
+| `bin\axis_check.exe` | none | Guided moves (right, up, toward you) + buttons. All should say PASS. |
+| `bin\force_direction.exe` | 0.3 N pulses | Hold the stylus loosely; ENTER sends each of 6 pushes. Checks motors push the right way. |
+| `bin\damping_field.exe` | drag only | "Honey": keys 0-3 change thickness. Should feel smooth. |
+| `bin\virtual_box.exe` | walls | ENTER puts an invisible box around the stylus. Walls should feel solid, not buzzy. |
+
+**Research tasks**
+
+| Command | What it does |
+|---|---|
+| `bin\position_tracker.exe --id P01` | Records movement at 1000 Hz, no forces. SPACE marks a new segment, Q saves. |
+| `bin\position_matching.exe --id P01` | Proprioception test: the arm guides the hand to a hidden target and back, the participant finds it again and presses the button. Saves errors per trial. |
+| `bin\reach_game.exe` | 3D center-out reaching, 24 trials. Saves reaction time, movement time, path ratio, peak speed, submovements per trial (`_trials.csv`). |
+
+**3D programs (see and feel)** — click the window; ENTER places the room around the stylus;
+drag/arrows rotate, wheel zooms, F force arrow, X remove room, Q quit.
+
+| Command | What to try |
+|---|---|
+| `bin\haptic_playground.exe` | Hard cube, soft sphere, a ball to push. |
+| `bin\grab_ball.exe` | Hold the stylus button near the ball to pick it up; 1/2/3 = 40/80/150 g; put it on the shelf or throw it. R resets. |
+| `bin\surfaces.exe` | Friction block (M = friction level), bumpy floor, magnet, honey zone. |
+| `bin\mechanisms.exe` | Clicky push button; hold the stylus button on the drawer handle or lever knob to grab them. |
+| `bin\physics_toys.exe` | Bumping balls, pendulum, wobbly soft blob. R resets. |
+
+**Options most programs accept:** `--k 0.2` (stiffness, N/mm, capped for safety), `--b 0.001` (damping),
+`--device "<name>"` (if Phantom Configuration has several devices), `--skip-calibration`,
+`--allow-uncalibrated`. Each program's options are listed at the top of its `apps\<name>\main.cpp`.
+
 ## Programs
 
 | Program | Forces? | What it does |
