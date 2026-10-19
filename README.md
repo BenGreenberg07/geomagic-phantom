@@ -85,6 +85,7 @@ git push
 |---|---|
 | `bin\position_tracker.exe --id P01` | Records movement at 1000 Hz, no forces. SPACE marks a new segment, Q saves. |
 | `bin\position_matching.exe --id P01` | Proprioception test: the arm guides the hand to a hidden target and back, the participant finds it again and presses the button. Saves errors per trial. |
+| `bin\adl_tasks.exe` | **ADL tasks of Smaby et al. 2004**: fork into putty, key, plug, two zippers, ATM card, doorbell button, at real dimensions with the paper's forces (scaled to the arm). Push in, ease off, press the button on the object, pull out. 1-7 practise, A protocol (3 cycles each). Saves `_trials.csv` with robot reference times. Details: [docs/ADL_TASKS.md](docs/ADL_TASKS.md). First run: `--force-gain 0.5`. |
 | `bin\reach_game.exe` | 3D center-out reaching, 24 trials. Saves reaction time, movement time, path ratio, peak speed, submovements per trial (`_trials.csv`). |
 
 **3D programs (see and feel)** — click the window; ENTER places the room around the stylus;
@@ -131,6 +132,7 @@ rotate the view, wheel zooms, F hides the force arrow, X removes the room, Q qui
 | `mechanisms` | Click button (force drop at 2.5 mm), a drawer on a rail with end stops and a magnetic catch, a lever with notches. Grab with button 1. |
 | `physics_toys` | Balls that bump each other, a 3D pendulum, a soft blob that wobbles and visibly dents. |
 | `draw3d` | 3D painting: air / easel (paper friction) / globe canvases, rainbow tubes, symmetry, touchable strokes. |
+| `adl_tasks` | The 7 ADL tasks of Smaby et al. 2004 with timed trials and the paper's (scaled) forces. `--selftest` checks the physics without a device. See [docs/ADL_TASKS.md](docs/ADL_TASKS.md). |
 
 All output goes to `data/` (git-ignored, because it's participant data).
 

@@ -128,6 +128,7 @@ HDstring hdGetErrorString(HDerror errorCode);
 #define HD_MOCK 1
 void hdMockSetHand(const double target[3], int buttons);
 void hdMockGetHand(double target[3]);
+void hdMockSetGimbal(const double angles[3]);  // rad; overrides the fake gimbal readings
 
 HDenum hdCheckCalibration(void);
 void hdUpdateCalibration(HDenum style);

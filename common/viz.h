@@ -310,6 +310,7 @@ inline void drawRoom(const Room& room, bool ghost) {
 // ---------------------------------------------------------------------------
 struct Ui {
     double yaw = 0, pitch = 20, dist = 260;
+    double tx = 0, ty = -10, tz = 0;  // point the camera looks at (room coords)
     bool dragging = false;
     double lastX = 0, lastY = 0;
     bool showForce = true;
@@ -510,9 +511,10 @@ inline void initGl() {
 inline Vec3 cameraEye() {
     Ui& u = ui();
     double yr = u.yaw * kPi / 180, pr = u.pitch * kPi / 180;
-    return Vec3(u.dist * std::sin(yr) * std::cos(pr), -10 + u.dist * std::sin(pr), u.dist * std::cos(yr) * std::cos(pr));
+    return Vec3(u.tx + u.dist * std::sin(yr) * std::cos(pr), u.ty + u.dist * std::sin(pr),
+                u.tz + u.dist * std::cos(yr) * std::cos(pr));
 }
-inline Vec3 cameraTarget() { return Vec3(0, -10, 0); }
+inline Vec3 cameraTarget() { return Vec3(ui().tx, ui().ty, ui().tz); }
 
 // Clear + camera. Device frame = OpenGL frame (+x right, +y up, +z toward you),
 // so yaw 0 looks at the room the way you face the device.
@@ -578,6 +580,8 @@ struct SceneBase {
     double maxStiffness = 0, maxDamping = 0;  // the device's nominal limits, filled in by run()
     // false: stylus button 1 belongs to the scene (e.g. grabbing); only ENTER places the room.
     static constexpr bool kButtonPlaces = true;
+    static constexpr bool kDrawRoom = true;    // false: the scene draws its own surroundings
+    static constexpr bool kDrawCursor = true;  // false: the scene draws its own stylus/hand
 
     void reset() {}
     void key(int) {}
@@ -586,6 +590,9 @@ struct SceneBase {
     void onStop() {}                                                   // main thread, before exit
     template <class S> void mainTick(const S&) {}                      // main thread, every frame
     template <class S> void status(const S&, char* buf, size_t n) const { if (n) buf[0] = 0; }  // title text
+    template <class S> void drawHud(const S&) const {}                 // main thread: 2D overlay, after the 3D scene
+    // Simulator only: return true to drive the hand yourself (autopilot tests). Room coordinates.
+    template <class S> bool simHand(const S&, double /*elapsed*/, Vec3& /*target*/, int& /*buttons*/) { return false; }
 };
 
 // Runs a scene until the window closes. Returns the process exit code.
@@ -624,7 +631,10 @@ int run(int argc, char** argv, Scene& scene, const char* name, const char* help)
         if (rt.removeReq) { rt.placed = false; rt.removeReq = false; }
         double dt = rt.lastT < 0 ? 0.001 : s.t - rt.lastT;
         rt.lastT = s.t;
-        if (dt <= 0 || dt > 0.005) dt = 0.001;
+        // Servo ticks are nominally 1 ms. Ticks can arrive in bursts (the Windows simulator runs
+        // ~16 back to back, microseconds apart), and dividing by a tiny dt turns tiny moves into huge
+        // velocities, so only trust the measured interval when it is plausible.
+        if (dt < 0.0005 || dt > 0.005) dt = 0.001;
         if (!rt.placed) { s.phase = 0; return Vec3(); }
         s.phase = 1;
         Vec3 f = scene.force(s, s.pos - rt.center, dt);
@@ -752,6 +762,11 @@ int run(int argc, char** argv, Scene& scene, const char* name, const char* help)
                 }
             }
             int simButtons = (u.simRight || u.simSpace) ? HD_DEVICE_BUTTON_1 : 0;
+            {
+                Vec3 at;
+                int ab = 0;
+                if (scene.simHand(snap, elapsed, at, ab)) { simTarget = at; simButtons = ab; }
+            }
             if (sweep) {  // VIZ_SWEEP: scripted hand path through the whole room instead of the mouse
                 double w = 2 * 3.14159265358979 / 8.0;
                 simTarget = Vec3(70 * std::sin(w * elapsed), 45 * std::sin(1.3 * w * elapsed),
@@ -764,11 +779,13 @@ int run(int argc, char** argv, Scene& scene, const char* name, const char* help)
         }
 #endif
 
-        drawRoom(scene.room, !placed);
+        if (Scene::kDrawRoom) drawRoom(scene.room, !placed);
         if (placed) {
             scene.draw(snap, cur);
-            drawShadow(cur, scene.cursorR * 1.2, scene.room.floor);
-            drawLine(cur, Vec3(cur.x, scene.room.floor, cur.z), 0.7, 0.7, 0.7);
+            if (Scene::kDrawCursor) {
+                drawShadow(cur, scene.cursorR * 1.2, scene.room.floor);
+                drawLine(cur, Vec3(cur.x, scene.room.floor, cur.z), 0.7, 0.7, 0.7);
+            }
         }
 #ifdef HD_MOCK
         {
@@ -780,8 +797,9 @@ int run(int argc, char** argv, Scene& scene, const char* name, const char* help)
         }
 #endif
         bool touching = now.phase >= 2;
-        drawSphere(cur, scene.cursorR, 1.0, touching ? 0.25 : 1.0, touching ? 0.25 : 1.0);
+        if (Scene::kDrawCursor) drawSphere(cur, scene.cursorR, 1.0, touching ? 0.25 : 1.0, touching ? 0.25 : 1.0);
         if (u.showForce && now.force.norm() > 0.01) drawLine(cur, cur + now.force * 15.0, 1.0, 0.9, 0.1, 3);  // 15 mm/N
+        if (placed) scene.drawHud(snap);
 
         bool shotNow = shotPath && quitAfter > 0 && elapsed >= quitAfter;
         if (shotNow) saveScreenshot(shotPath);

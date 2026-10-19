@@ -43,6 +43,8 @@ struct Sim {
     bool extHand = false;
     double extTarget[3] = {0, 0, 0}, extSmooth[3] = {0, 0, 0};
     int extButtons = 0;
+    bool extGimbal = false;          // gimbal angles set by hdMockSetGimbal (autopilot twist tests)
+    double gimbalSet[3] = {0, 0, 0};
 
     void step(double dt) {
         double tgt[3];
@@ -175,7 +177,10 @@ void hdGetDoublev(HDenum e, HDdouble* p) {
     case HD_CURRENT_FORCE: std::memcpy(p, g.cmdForce, 3 * sizeof(double)); break;
     case HD_CURRENT_JOINT_ANGLES:
         p[0] = std::atan2(g.pos[0], 200.0); p[1] = g.pos[1] / 300.0; p[2] = g.pos[2] / 300.0; break;
-    case HD_CURRENT_GIMBAL_ANGLES: p[0] = 0.1 * std::sin(g.t); p[1] = 0.05; p[2] = 0.0; break;
+    case HD_CURRENT_GIMBAL_ANGLES:
+        if (g.extGimbal) { std::lock_guard<std::mutex> l(g.handMu); std::memcpy(p, g.gimbalSet, 3 * sizeof(double)); }
+        else { p[0] = 0.1 * std::sin(g.t); p[1] = 0.05; p[2] = 0.0; }
+        break;
     case HD_NOMINAL_MAX_FORCE: *p = g.maxForce; break;
     case HD_NOMINAL_MAX_CONTINUOUS_FORCE: *p = g.maxCont; break;
     case HD_NOMINAL_MAX_STIFFNESS: *p = g.maxStiff; break;
@@ -249,6 +254,11 @@ void hdMockSetHand(const double target[3], int buttons) {
     for (int i = 0; i < 3; ++i) g.extTarget[i] = target[i];
     g.extButtons = buttons;
     g.extHand = true;
+}
+void hdMockSetGimbal(const double angles[3]) {
+    std::lock_guard<std::mutex> l(g.handMu);
+    for (int i = 0; i < 3; ++i) g.gimbalSet[i] = angles[i];
+    g.extGimbal = true;
 }
 void hdMockGetHand(double target[3]) {
     std::lock_guard<std::mutex> l(g.handMu);

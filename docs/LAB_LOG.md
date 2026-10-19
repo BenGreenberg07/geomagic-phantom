@@ -3,6 +3,27 @@
 What was tried on the real device, what happened, and what was changed because of it.
 Newest first. Raw recordings stay in `data/` on the lab PC (never committed).
 
+## 2026-10-19 (lab PC, simulator only): ADL task simulator built and validated
+
+New program `adl_tasks`: the 7 key-pinch ADL tasks of Smaby et al. 2004 (fork, key, plug, vertical and
+horizontal zipper, ATM card, doorbell remote) at real dimensions, with the paper's peak object forces mapped
+into the arm's range (F_sim = 3.0·(F_real/20.7)^0.4). Methods, parameters, sources and limitations:
+[`docs/ADL_TASKS.md`](ADL_TASKS.md).
+- Reading the paper: its Table 1 times are **robot** execution times (3 speeds), so they are logged as
+  "robot reference times". Peak object forces recovered from the reported pinch ranges (× 2μ).
+- `--selftest` (no device): all tasks, 3 cycles each, plus the full protocol, with deliberate mistakes
+  (off-centre key guided in by the chamfer; far off-centre key blocked; 25°-twisted plug jammed). Pass;
+  profile peaks within 1–4 % of target.
+- **Framework bug found and fixed (`common/viz.h`):** the Windows simulator delivers servo ticks in bursts
+  microseconds apart; the runner accepted those tiny intervals as dt, which turned tiny moves into huge
+  velocities (wrong-direction damping forces up to 3.5 N in the live sim). dt is now trusted only between
+  0.5 and 5 ms (else 1 ms). Affected every 3D app in the Windows simulator; real hardware ticks at 1 kHz.
+  After the fix: live protocol 39/39 actions, max force change 0.081 N/tick, implied real peaks match the
+  paper (e.g. plug in 21 N vs 20.7, key in 4.2 vs 4.1, H-zipper close 12.5 vs 12.2).
+- Zipper tracks shortened to 45 / 60 mm to fit the workspace (zipper times not comparable to the robot's).
+- Open for the first real-device session: confirm the gimbal axis used for twist (`--roll-axis`, default 2);
+  start with `--force-gain 0.5`; check the plug (3.0 N) and horizontal zipper (2.4 N) feel solid, not buzzy.
+
 ## 2026-10-02 (evening, Mac): simulator check of the lab session's work
 
 No device. Everything checked against the simulator (tools/hd_mock).
