@@ -200,6 +200,9 @@ struct Insertion {
     int atm = 0;                    // ATM reader: 0 idle, 1 accepting, 2 intake, 3 inside, 4 eject, 5 presented
     double atmT = 0;
     bool goalInDone = false;
+    bool rotBlocked = false, onFace = false;  // approach: twist block (with hysteresis), touching the flat face
+    bool haveProxy = false;                   // proxy rate limit state
+    Vec3 lastProxyW, lastD;
 
     void setup(int task) {
         id = task;
@@ -222,6 +225,7 @@ struct Insertion {
         stage = HAND; engaged = false; jam = false; sp = spPrev = 0; latU = latW = 0;
         tipOff = tipDefault; cp.reset(); cp.alphaT = 1; atm = 0; atmT = 0; goalInDone = false;
         proxyTip = Vec3();
+        rotBlocked = false; onFace = false; haveProxy = false;
     }
     Vec3 objTip() const { return E + n * sp + u * latU + w * latW; }  // where the object is when not held
     bool readerMoving() const { return id == ATM && atm >= 2 && atm <= 4; }  // the ATM is moving the card itself
@@ -299,27 +303,47 @@ struct Insertion {
             double dd = dot(rel, n), eu = dot(rel, u), ew = dot(rel, w);
             jam = false;
             if (!engaged) {
-                bool rotBlocked = in.rollOn && std::fabs(in.roll) > rollTol;
+                // Rotation block, with 1.5 deg hysteresis so a hand hovering at the limit doesn't flicker.
+                double ar = std::fabs(in.roll);
+                if (!in.rollOn) rotBlocked = false;
+                else if (ar > rollTol) rotBlocked = true;
+                else if (ar < rollTol - 0.026) rotBlocked = false;
+                // Lateral excess r = distance from the tip to the hole's cross-section (a rectangle
+                // tolU x tolW), Euclidean so the corners are rounded and the push direction never flips.
                 double exU = std::fabs(eu) - tolU, exW = std::fabs(ew) - tolW;
-                if (rotBlocked) { exU = std::fmax(exU, cham + 1); }
-                double lim = std::fmax(exU, exW);
-                double pu = eu, pw = ew, pd = dd;
-                if (lim <= 0) {
-                    if (dd > 0) {
-                        engaged = true; sp = dd; spPrev = dd; latU = eu; latW = ew;
-                    }
-                } else if (lim >= cham) {
-                    if (dd > -cham) { pd = -cham; jam = rotBlocked; }       // flat face
-                } else if (dd > -lim) {                                     // on the 45-degree chamfer: slide in
-                    double s = (dd + lim) / 2;
-                    pd = dd - s;
-                    if (exU >= exW) pu = (eu > 0 ? 1 : -1) * (std::fabs(eu) - s);
-                    else pw = (ew > 0 ? 1 : -1) * (std::fabs(ew) - s);
+                double cu = clampd(eu, -tolU, tolU), cw = clampd(ew, -tolW, tolW);  // nearest point of the hole
+                double r, du = 0, dw = 0;
+                if (exU > 0 || exW > 0) {
+                    double ru = std::fmax(exU, 0), rw = std::fmax(exW, 0);
+                    r = std::sqrt(ru * ru + rw * rw);
+                    du = (eu > 0 ? 1 : -1) * ru / r; dw = (ew > 0 ? 1 : -1) * rw / r;
+                } else {
+                    r = std::fmax(exU, exW);
                 }
-                if (!engaged) {
-                    proxy = E + n * pd + u * pu + w * pw;
-                    o.contact = (proxy - D).norm() > 1e-6;
-                    if (o.contact) o.objF = in.kc * (proxy - D).norm();
+                // In the (r, depth) plane the wall is solid where depth > -min(r, cham): a 45-degree
+                // funnel from the hole's mouth (r = 0, depth 0) out to r = cham, then the flat face.
+                double tu = eu, tw = ew, td = dd;  // target for the object's tip (lateral u, w and depth)
+                int surf = 0;                      // 0 free, 1 flat face, 2 funnel slope
+                if (rotBlocked) {
+                    // twisted too far: it can't enter the funnel; the whole entrance acts as a flat face
+                    if (dd > -cham) { td = -cham; surf = 1; jam = true; }
+                } else if (r <= 0) {
+                    if (dd > 0) engaged = true;  // straight into the mouth
+                } else if (dd > -std::fmin(r, cham)) {
+                    double t = (r - dd) / 2;     // projection onto the slope: point (t, -t)
+                    bool face = r >= cham && (onFace || t > cham);
+                    if (face) { td = -cham; surf = 1; }
+                    else if (t <= 0) engaged = true;  // slid down the slope to the mouth: in
+                    else {
+                        t = std::fmin(t, cham);
+                        tu = cu + du * t; tw = cw + dw * t; td = -t; surf = 2;
+                    }
+                }
+                onFace = surf == 1;
+                if (engaged) {  // enter at the mouth: the depth then advances along the profile from 0
+                    sp = spPrev = 0; latU = cu; latW = cw;
+                } else {
+                    proxy = E + n * td + u * tu + w * tw;
                 }
             }
             if (engaged) {
@@ -334,6 +358,20 @@ struct Insertion {
                 proxy = E + n * sp + u * latU + w * latW;
                 o.objF = std::fabs(in.kc * (dd - sp));
                 o.contact = true;
+            }
+            // The object can keep up with the hand, plus slide at most 60 mm/s (400 while engaged, where
+            // the profile already moves it smoothly) when the contact changes surface, e.g. slipping off
+            // an edge while pressing hard: a quick slide instead of a jump.
+            if (haveProxy) {
+                double lim = (D - lastD).norm() + (engaged ? 400.0 : 60.0) * in.dt;
+                Vec3 dp = proxy - lastProxyW;
+                double m = dp.norm();
+                if (m > lim) proxy = lastProxyW + dp * (lim / m);
+            }
+            haveProxy = true; lastProxyW = proxy; lastD = D;
+            if (!engaged) {
+                o.contact = (proxy - D).norm() > 1e-6;
+                if (o.contact) o.objF = in.kc * (proxy - D).norm();
             }
             proxyTip = proxy;
             o.f = cp.force(proxy, D, in.v, in);
@@ -368,6 +406,7 @@ struct Insertion {
                 tipOff = objTip() - in.p;   // grip it exactly where it is: no force step
                 cp.alphaT = 1; cp.have = false; cp.corr = Vec3();
                 stage = PULLING; engaged = true; o.ev.regrip = true;
+                haveProxy = false;
             }
         }
         return o;

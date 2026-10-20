@@ -182,6 +182,79 @@ inline int run() {
 
 }  // namespace selftest
 
+// ============================================================================
+// Replay: feed a recorded session (positions, buttons, twist) back through the task models
+// and report every sudden force change. Open loop (the hand does not react to the new forces),
+// so it shows where the physics is discontinuous. No device needed.
+// ============================================================================
+namespace replay {
+
+inline int run(const char* path, int rollAxis, double gain, bool verbose) {
+    FILE* f = std::fopen(path, "r");
+    if (!f) { std::printf("cannot open %s\n", path); return 1; }
+    char line[1024];
+    if (!std::fgets(line, sizeof line, f)) { std::fclose(f); return 1; }  // header
+    adl::AdlCore core;
+    core.forceGain = gain;
+    bool placed = false, prevBtn = false;
+    Vec3 center, lastF;
+    double lastT = 0;
+    int lastTask = -1, n = 0, steps = 0;
+    double maxStep = 0, sumStep = 0;
+    int stepsBy[80] = {};
+    while (std::fgets(line, sizeof line, f)) {
+        double c[21] = {};
+        int k = 0;
+        for (char* s = line; k < 21 && *s; ++k) {
+            c[k] = std::strtod(s, &s);
+            if (*s == ',') ++s;
+        }
+        if (k < 19) continue;
+        int phase = (int)c[18];
+        if (phase == 0) { placed = false; continue; }
+        Vec3 pos(c[1], c[2], c[3]);
+        if (!placed) { placed = true; center = pos; core.restartCycle(); }
+        int task = phase / 10 - 1;
+        if (task != lastTask) { core.setTask(task); lastTask = task; }
+        double dt = c[0] - lastT;
+        lastT = c[0];
+        if (dt < 0.0005 || dt > 0.005) dt = 0.001;
+        adl::Input in;
+        in.p = pos - center; in.v = Vec3(c[4], c[5], c[6]);
+        in.btn = c[16] != 0; in.press = in.btn && !prevBtn; prevBtn = in.btn;
+        in.kc = 0.25; in.bc = 0.0015; in.cursorR = 3; in.t = c[0]; in.dt = dt;
+        int ph = 0;
+        Vec3 F = core.step(in, c[13 + rollAxis], &ph);
+        double d = (F - lastF).norm();
+        if (core.gainRamp >= 1.0 && n > 0) {
+            maxStep = std::fmax(maxStep, d);
+            sumStep += d;
+            if (d > 0.1) {
+                steps++;
+                if (ph >= 0 && ph < 80) stepsBy[ph]++;
+                if (verbose) {
+                    const adl::Insertion* ins = task == adl::KEY ? &core.key : task == adl::PLUG ? &core.plug
+                                              : task == adl::ATM ? &core.atm : nullptr;
+                    std::printf("t=%.4f ph=%d |F| %.3f -> %.3f (step %.3f)", c[0], ph, lastF.norm(), F.norm(), d);
+                    if (ins) std::printf(" engaged=%d jam=%d sp=%.2f alpha=%.2f", ins->engaged, ins->jam, ins->sp,
+                                         ins->cp.alpha);
+                    std::printf("\n");
+                }
+            }
+        }
+        lastF = F;
+        n++;
+    }
+    std::fclose(f);
+    std::printf("%d samples, %d force steps > 0.1 N/tick, largest %.3f N, total variation %.1f N\n", n, steps, maxStep,
+                sumStep);
+    for (int p = 0; p < 80; ++p)
+        if (stepsBy[p]) std::printf("  phase %d: %d\n", p, stepsBy[p]);
+    return 0;
+}
+
+}  // namespace replay
+
 #if VIZ_AVAILABLE
 #include "adl_draw.h"
 
@@ -343,6 +416,10 @@ struct AdlScene : viz::SceneBase {
 int main(int argc, char** argv) {
     util::Args args(argc, argv);
     if (args.flag("--selftest")) return selftest::run();
+    std::string rp = args.get("--replay", "");
+    if (!rp.empty())
+        return replay::run(rp.c_str(), (int)adl::clampd(args.num("--roll-axis", 2), 0, 2),
+                           adl::clampd(args.num("--force-gain", 1.0), 0.1, 1.0), args.flag("--verbose"));
 #if VIZ_AVAILABLE
     static AdlScene scene;  // static: a few kB of task state
     scene.core.forceGain = adl::clampd(args.num("--force-gain", 1.0), 0.1, 1.0);

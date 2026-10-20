@@ -3,6 +3,24 @@
 What was tried on the real device, what happened, and what was changed because of it.
 Newest first. Raw recordings stay in `data/` on the lab PC (never committed).
 
+## 2026-10-20 (lab PC, real arm): first ADL run, key and plug jitter fixed
+
+First run of `adl_tasks` on the arm (`--force-gain 0.5`, then 1.0 for fork, zippers, ATM, remote). All 7 tasks
+completed; after a few tries times came close to the robot reference (key in ~1.1 s, plug in ~1.0 s); key and
+plug profile peaks mapped back to 4.2 / 21 N (paper 4.1 / 20.7). No safety trips.
+- **Key and plug felt jittery while lining up.** The recording showed 646 (key) and 129 (plug) force jumps
+  > 0.1 N/tick, up to 2 N, all *before* the object entered the hole. Cause: the funnel (chamfer) model
+  flipped between "flat face" and "funnel slope", and between the two sideways directions at the hole's
+  corners, moving the contact point several mm in one tick; each flip also kicked the damping (instant
+  0.3 N drops); and entering the hole snapped the object forward to the hand's depth.
+- **Fix (`adl_models.h`, Insertion):** exact 45-degree funnel in (lateral distance, depth) with rounded
+  corners; remembers which surface it touches; the contact point keeps up with the hand but slides at most
+  60 mm/s extra when it changes surface (slipping off an edge is a quick slide, not a jump); the object enters
+  from the mouth; 1.5 deg hysteresis on the twist block.
+- **New `--replay <file.csv>`:** feeds a recorded session back through the models (open loop) and counts force
+  jumps per phase. On this session: approach jumps 648 -> 0 (key), 129 -> 0 (plug). Remaining steps are the
+  designed pin clicks. Self-test passes.
+
 ## 2026-10-19 (lab PC, simulator only): ADL task simulator built and validated
 
 New program `adl_tasks`: the 7 key-pinch ADL tasks of Smaby et al. 2004 (fork, key, plug, vertical and
