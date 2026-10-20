@@ -13,6 +13,8 @@ build.bat adl_tasks            real device          bin\adl_tasks.exe
 build.bat sim adl_tasks        simulator (mouse)    bin\sim\adl_tasks.exe
 bin\adl_tasks.exe --selftest   physics self-test, no device needed (exit code 0 = pass)
 bin\adl_tasks.exe --force-gain 0.5     gentler first run on the arm
+bin\adl_tasks.exe --replay data\<file>.csv [--force-gain 0.5] [--verbose]
+                               re-run a recording through the physics, count sudden force changes per phase
 ```
 
 ## What the paper measured (and what that means for comparisons)
@@ -69,6 +71,9 @@ and the hand feels a spring (kc = 0.25 N/mm, ≤ 30 % of the device's max stiffn
 the object. Along the task axis the proxy advances only when the spring force exceeds the task's
 resistance profile R(depth) (a stick-slip window: different profiles for pushing in and pulling out), so the
 felt force *is* the profile; the proxy moves at most 300 mm/s, so clicks are crisp but never one-tick steps.
+Entrances (key, plug, card) are an exact 45-degree funnel with rounded corners; the contact remembers which
+surface it touches and slides at most 60 mm/s faster than the hand when it changes surface, so slipping off an
+edge is a quick slide, not a jolt; the object enters the channel from its mouth.
 Force changes are limited to ≤ 0.1 N per servo tick; contacts fade in/out over 40 ms; task switches fade in
 over 0.5 s. Shapes come from standards, datasheets and patents (sources below); every shape is scaled to
 the task's mapped peak.
